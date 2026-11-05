@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OutSystems MCP</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">OS</span>
+      <div class="brand-text">
+        <h1>OutSystems MCP</h1>
+        <p class="sub" id="subtitle">Loading…</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn" id="btnProbe" type="button" disabled>Check endpoints</button>
+      <button class="btn" id="btnApply" type="button" disabled>Apply to clients</button>
+      <button class="btn primary" id="btnAdd" type="button" disabled>Add server</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <p class="hint" id="loadingState" role="status">Reading server registry…</p>
+    <div class="form-error" id="loadError" role="alert" hidden>
+      <p id="loadErrorText"></p>
+      <button class="btn" type="button" id="btnRetry">Retry</button>
+    </div>
+    <p class="form-error" id="applyError" role="alert" hidden></p>
+    <p class="form-error" id="actionError" role="alert" hidden></p>
+    <section class="panel" aria-labelledby="serversTitle">
+      <div class="panel-head">
+        <div>
+          <h2 id="serversTitle">Servers</h2>
+          <p class="hint" id="activeHint">Add a server, then apply its config to your MCP client.</p>
+          <p class="hint location" id="installationLocation" hidden></p>
+        </div>
+        <div class="install-target" id="installTarget"></div>
+      </div>
+
+      <div class="table-wrap" hidden>
+        <table class="grid">
+          <thead>
+            <tr>
+              <th scope="col">Server</th>
+              <th scope="col">Type</th>
+              <th scope="col">Endpoint</th>
+              <th scope="col">Endpoint check</th>
+              <th scope="col">Selected</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="serverRows"></tbody>
+        </table>
+      </div>
+
+      <div class="empty" id="emptyState" hidden>
+        <p class="empty-title">No servers yet</p>
+        <p class="empty-body">Add an ODC tenant or the Service Studio port shown in MCP Configuration.</p>
+        <button class="btn primary" type="button" data-open-add>Add first server</button>
+      </div>
+    </section>
+    <p class="hint auth-note">Endpoint checks do not read your client's OAuth session. This app does not keep ODC signed in.</p>
+  </main>
+
+  <footer class="tray" aria-label="Quick server selection">
+    <span class="tray-title">Quick select</span>
+    <ul class="tray-list" id="trayList"></ul>
+    <span class="tray-hint" id="trayHint">Select a server, then Apply and reload your MCP client.</span>
+  </footer>
+</div>
+
+<dialog class="dialog wizard" id="wizard" aria-labelledby="wizardTitle">
+  <div class="wizard-head">
+    <ol class="steps" id="wizardSteps">
+      <li data-step-dot="1" class="is-on">Server details</li>
+      <li data-step-dot="2">MCP clients</li>
+    </ol>
+    <h2 id="wizardTitle">Add your first server</h2>
+    <p class="dialog-sub" id="wizardSub">ODC needs a tenant hostname. Service Studio needs the port it shows.</p>
+    <p class="hint location" id="wizardLocation" hidden></p>
+    <button class="link wizard-close" type="button" id="wizSkip">Close setup</button>
+  </div>
+
+  <form class="wizard-step" data-step="1" id="wizardServerForm">
+    <div class="seg" role="group" aria-label="Server type" id="wizKind">
+      <button type="button" class="seg-btn is-on" data-kind="odc" aria-pressed="true">ODC tenant</button>
+      <button type="button" class="seg-btn" data-kind="o11" aria-pressed="false">O11 Service Studio</button>
+    </div>
+
+    <label class="field">
+      <span>Server name</span>
+      <input id="wizName" value="outsystems" autocomplete="off" spellcheck="false" required maxlength="64" pattern="[a-z0-9][a-z0-9_\-]{0,63}">
+      <small>Shown in the client and used as the tool prefix. Lowercase, no spaces.</small>
+    </label>
+    <label class="field" data-for="odc">
+      <span>Tenant hostname</span>
+      <input id="wizTenant" placeholder="mycompany.outsystems.dev" autocomplete="off" spellcheck="false" required>
+      <small>Host only. Scheme, path, and query are dropped automatically.</small>
+    </label>
+    <label class="field" data-for="o11" hidden>
+      <span>Service Studio port</span>
+      <input id="wizPort" type="number" value="41820" min="1" max="65535" step="1" inputmode="numeric" required disabled>
+      <small>Copy it from Edit &gt; MCP Configuration. The default is 41820.</small>
+    </label>
+    <p class="form-error" id="wizServerError" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button class="btn primary" type="submit" id="wizNext">Choose clients</button>
+    </div>
+  </form>
+
+  <form class="wizard-step" data-step="2" id="wizardClientForm" hidden>
+    <fieldset class="scopes">
+      <legend>Config scope</legend>
+      <label class="radio">
+        <input type="radio" name="wizScope" value="user" checked>
+        <span><strong>User</strong>, every project for your Windows account</span>
+      </label>
+      <label class="radio">
+        <input type="radio" name="wizScope" value="project">
+        <span><strong>Project</strong>, only the folder you choose below</span>
+      </label>
+    </fieldset>
+    <label class="field" id="wizProjectField" hidden>
+      <span>Project folder (full path)</span>
+      <input id="wizProjectDir" autocomplete="off" spellcheck="false" disabled>
+      <small>Choose your source project, not the OutSystems MCP application folder.</small>
+    </label>
+    <fieldset class="clients">
+      <legend>MCP clients and config paths</legend>
+      <div id="clientChoices" class="choice-grid"></div>
+    </fieldset>
+    <p class="form-error" id="wizError" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button class="btn" type="button" id="wizBack">Back</button>
+      <button class="btn primary" type="submit" id="wizFinish">Add server and apply</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dialog" id="addDialog" aria-labelledby="addTitle">
+  <form id="addForm">
+  <h2 id="addTitle">Add server</h2>
+  <p class="dialog-sub">One server per tenant or Service Studio instance.</p>
+
+  <div class="seg" role="group" aria-label="Server type" id="addKind">
+    <button type="button" class="seg-btn is-on" data-kind="odc" aria-pressed="true">ODC tenant</button>
+    <button type="button" class="seg-btn" data-kind="o11" aria-pressed="false">O11 Service Studio</button>
+  </div>
+
+  <label class="field">
+    <span>Server name</span>
+    <input id="addName" value="outsystems" autocomplete="off" spellcheck="false" required maxlength="64" pattern="[a-z0-9][a-z0-9_\-]{0,63}">
+  </label>
+  <label class="field" data-for="odc">
+    <span>Tenant hostname</span>
+    <input id="addTenant" placeholder="mycompany.outsystems.dev" autocomplete="off" spellcheck="false" required>
+  </label>
+  <label class="field" data-for="o11" hidden>
+    <span>Service Studio port</span>
+    <input id="addPort" type="number" value="41820" min="1" max="65535" step="1" inputmode="numeric" required disabled>
+  </label>
+  <p class="form-error" id="addError" role="alert" hidden></p>
+  <div class="dialog-actions">
+    <button class="btn" type="button" data-close-add>Cancel</button>
+    <button class="btn primary" type="submit" id="addSubmit">Add server</button>
+  </div>
+  </form>
+</dialog>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

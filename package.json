@@ -1,0 +1,16 @@
+{
+  "name": "outsystems-mcp-installer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Install and switch multiple OutSystems MCP servers (ODC and O11 Service Studio) across MCP clients.",
+  "type": "module",
+  "bin": {
+    "oms": "./bin/oms.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
